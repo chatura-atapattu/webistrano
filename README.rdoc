@@ -16,11 +16,14 @@ Webistrano is a Web UI for managing Capistrano deployments. It lets you manage p
    Copy config/database.yml.sample to config/database.yml and edit to resemble your setting. You need at least the production database. The others are optional entries for development and testing.
   
    Then create the database structure with Rake:
+
    <tt>cd webistrano</tt>
+
    <tt>RAILS_ENV=production rake db:migrate</tt>
   
 3. Start Webistrano  
    <tt>cd webistrano</tt>
+
    <tt>ruby script/rails server -d -p 3000 -e production</tt>
   
    Webistrano is then available at http://host:3000/
@@ -29,15 +32,15 @@ The default user is `admin`, the password is `admin`. Please change the password
 
 
 == Author:
-  Jonathan Weiss <jw@innerewut.de>
+Jonathan Weiss <jw@innerewut.de>
 
 
 == IMPORTANT NOTES
-  * Not fully tested
-  * CAS Authentication still needs to be tested
-  * Use of "multiple_select" plugin which was removed needs to be purged
+* Not fully tested
+* CAS Authentication still needs to be tested
+* Use of "multiple_select" plugin which was removed needs to be purged
 
 
 == License: 
-  Code: BSD, see LICENSE.txt
-  Images: Right to use in their provided form in Webistrano installations. No other right granted.
+Code: BSD, see LICENSE.txt
+Images: Right to use in their provided form in Webistrano installations. No other right granted.
