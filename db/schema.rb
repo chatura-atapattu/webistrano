@@ -70,8 +70,8 @@ ActiveRecord::Schema.define(:version => 20120405152637) do
     t.string   "name"
     t.text     "body"
     t.text     "description"
-    t.datetime "created_at",  :null => false
-    t.datetime "updated_at",  :null => false
+    t.datetime "created_at"
+    t.datetime "updated_at"
   end
 
   create_table "recipes", :force => true do |t|

@@ -1,3 +1,6 @@
+require 'capistrano'
+require 'capistrano/cli'
+
 module Webistrano
   class Deployer
     # Mix-in the Capistrano behavior

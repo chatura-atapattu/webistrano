@@ -1,4 +1,5 @@
 module RecipesHelper
+  require 'syntax/convertors/html'
   def highlight_syntax(code)
     Syntax::Convertors::HTML.for_syntax("ruby").convert(code)
   end

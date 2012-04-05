@@ -126,10 +126,12 @@ class Deployment < ActiveRecord::Base
   
   # deploy through Webistrano::Deployer in background (== other process)
   # TODO - at the moment `Unix &` hack
-  def deploy_in_background! 
+  def deploy_in_background!
+    debugger
     unless Rails.env == 'test'   
       Rails.logger.info "Calling other ruby process in the background in order to deploy deployment #{self.id} (stage #{self.stage.id}/#{self.stage.name})"
-      system("sh -c \"cd #{Rails.root} && ruby script/runner -e #{Rails.env} ' deployment = Deployment.find(#{self.id}); deployment.prompt_config = #{self.prompt_config.inspect.gsub('"', '\"')} ; Webistrano::Deployer.new(deployment).invoke_task! ' >> #{Rails.root}/log/#{Rails.env}.log 2>&1\" &")
+      debugger
+      system("sh -c \"cd #{Rails.root} && ruby script/rails runner -e #{Rails.env} ' deployment = Deployment.find(#{self.id}); deployment.prompt_config = #{self.prompt_config.inspect.gsub('"', '\"')} ; Webistrano::Deployer.new(deployment).invoke_task! ' >> #{Rails.root}/log/#{Rails.env}.log 2>&1\" &")
     end
   end
   

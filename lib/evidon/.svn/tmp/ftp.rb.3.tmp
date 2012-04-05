@@ -1,0 +1,427 @@
+require 'rubygems'
+require 'backports'
+require_relative 'tag_js'
+require 'net/ftp'
+require 'packr'
+require 'closure-compiler'
+require 'soap/wsdlDriver'
+require 'htmlentities'
+
+# methods for uploading the JS file to an FTP server defined in ftp.yml
+module Evidon
+
+  module FTP
+
+    include Evidon::TagJS
+
+    AKAMAI_BASE_URL = "http://c.betrad.com/"
+
+    # update URLs with the correct ones for the Staging environment
+    # e.g., http://staging.betteradvertising.com/ftp/staging/
+    def self.prepare_staging_js
+      js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js"
+      js = File.new(js_file).read
+
+      ret = js.gsub!( %r{^\s*DOMAIN_JSON = DOMAIN_ROOT \+ '/a/',\s*$}, '  DOMAIN_JSON = DOMAIN_ROOT + "/",')
+      ret = js.gsub!( %r{^\s*DOMAIN_INFO = 'http://info.evidon.com/',\s*$}, ' DOMAIN_INFO = \'http://staginginfo.evidon.com/\',')
+      ret = js.gsub!( %r{^\s*DOMAIN_CSS = DOMAIN_ROOT \+ '/a/',\s*$}, ' DOMAIN_CSS = DOMAIN_ROOT + "/ftp/staging/a/",')
+      ret = js.gsub!( %r{^\s*DOMAIN_ROOT = \(\('https:' == document\.location\.protocol\) \? 'https:\/\/a248\.e\.akamai\.net\/betterad\.download\.akamai\.com\/91609' : 'http://c\.betrad\.com'\),\s*$}, '  DOMAIN_ROOT = ( ("https:" == document.location.protocol) ? "https://" : "http://"  ) + "staginginfo.evidon.com/ftp/staging",')
+      if ret.nil? then
+        LOGGER.info "ERROR: unable to locate string for substituting DOMAIN_JSON with staging URL;"
+        LOGGER.info "    the format may have changed."
+        exit
+      end
+      File.open(js_file, 'w') { |file| file.write(js) }
+    end
+
+    def self.append_revision
+      rev = Evidon::TagJS.get_tag_revision
+      js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js"
+      File.open(js_file, 'a') do |file|
+        file.puts "\n"
+        file.puts "BAP.SVNREV = 'r#{rev}';"
+      end
+      mobile_js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/mobile.js"
+      File.open(mobile_js_file, 'a') do |file|
+        file.puts "\n"
+        file.puts "BAP.SVNREV = 'r#{rev}';"
+      end
+    end
+
+    def self.generate_versions(translations, cap_env)
+      LOGGER.info " * generating translated versions"
+      
+      coder = HTMLEntities.new
+
+      # Generate versions for all countries (including US)
+      translations.each { |country|
+        code = country[0]
+        localized_text = translations[code]
+        
+        js = File.read(PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js")
+        
+        js = Evidon::TagJS.substitute_localized_text(js, coder, code, localized_text)
+
+				# Change DOMAIN_INFO to staging if deploying to stage.
+        if cap_env == "staging"
+          js.gsub!(/DOMAIN_INFO = \'http:\/\/info.evidon./, "DOMAIN_INFO = 'http://staginginfo.evidon.")
+        end
+
+        File.open(PRIVACY_WEB_ROOT_DIR + "/tmp/ba-" + code + ".js", 'w') do |file|
+          file.puts js
+        end
+        
+        if cap_env != "staging"
+          compress_js(PRIVACY_WEB_ROOT_DIR + "/tmp/ba-" + code + ".js")
+        end
+      }
+      
+      #Copy US version to ba.js after all versions have been generated
+      js = File.read(PRIVACY_WEB_ROOT_DIR + "/tmp/ba-us.js")
+      File.open(PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js", 'w') do |file|
+        file.puts js
+      end  
+    end
+
+    def self.skip_notices(skip_ids)
+      LOGGER.info " * integrating skip notice ids"
+
+      js = File.read(PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js")
+      js.gsub!( %r{skip = \[\]}, "skip = [#{skip_ids}]")
+      File.open(PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js", 'w') do |file|
+        file.puts js
+      end
+      
+      mobile_js = File.read(PRIVACY_WEB_ROOT_DIR + "/tmp/mobile.js")
+      mobile_js.gsub!( %r{skip = \[\]}, "skip = [#{skip_ids}]")
+      File.open(PRIVACY_WEB_ROOT_DIR + "/tmp/mobile.js", 'w') do |file|
+        file.puts mobile_js
+      end
+    end
+
+    def self.compress_js(js_file, name = 'ba')
+      minified = Evidon::CleanJS.cleanup(js_file)
+      File.open(PRIVACY_WEB_ROOT_DIR + "/tmp/#{name}-cleanup.js", 'w') { |f| f.write(minified) }
+
+      #compressed = Packr.pack(minified, :shrink_vars => true, :base62 => true)
+      compressed = Closure::Compiler.new.compile(minified)
+      File.open(js_file, 'w'){ |f| f.write(compressed) }
+    end
+    
+    def self.load_ftp_config(cap_env)
+      ftp_config = File.join(PRIVACY_WEB_ROOT_DIR, "config/ftp.yml")
+      if not File.exists? ftp_config then
+        LOGGER.info "ERROR: ftp.yml not found! (in #{ftp_config})"
+        exit
+      end
+
+      ftp_config = YAML.load(File.open(ftp_config))
+      if not ftp_config.has_key? cap_env then
+        LOGGER.info "ERROR: stage '#{cap_env}' not found in config.yml"
+        exit
+      end
+      ftp_config = ftp_config[cap_env]
+    end
+
+    def self.upload_js(cap_env, repository, scm_username, scm_password, skip_ids, dry_run = false)
+      repository.chomp!("/")
+      
+      @cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''
+      
+      Evidon::TagJS.set_repository(repository)
+      Evidon::TagJS.fetch_js(cap_env, @cred)
+      Evidon::TagJS.fetch_mobile_js(cap_env, @cred)
+      
+      translations = Evidon::TagJS.load_translations(cap_env)
+
+      ftp_config = load_ftp_config(cap_env)
+
+      if cap_env == "staging" then
+        prepare_staging_js()
+      end
+      
+      append_revision()
+
+      skip_notices(skip_ids)
+
+      generate_versions(translations, cap_env)
+
+      js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js"
+      mobile_js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/mobile.js"
+
+      BasicSocket.do_not_reverse_lookup = true
+
+      LOGGER.info " * uploading tmp/ba.js and tmp/mobile.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]} passive : #{ftp_config["passive"]}"
+
+      return if dry_run
+
+      Net::FTP.open(ftp_config["host"], ftp_config["user"], ftp_config["pass"]) do |ftp|
+        ftp.passive = true if ftp_config["passive"]
+        ftp.chdir(ftp_config["remote_dir"])
+        ftp.puttextfile(js_file)
+        ftp.puttextfile(mobile_js_file)
+
+        if cap_env == "staging" then
+          # upload separate minified version to staging
+          LOGGER.info " * uploading /tmp/ba.min.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]} passive : #{ftp.passive}"
+          compress_js(js_file)
+          ftp.puttextfile(js_file, "ba.min.js")
+          LOGGER.info " * uploading /tmp/mobile.min.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]} passive : #{ftp.passive}"
+          compress_js(mobile_js_file)
+          ftp.puttextfile(mobile_js_file, "mobile.min.js")
+          ftp.puttextfile(PRIVACY_WEB_ROOT_DIR + "/tmp/ba-cleanup.js", "ba.cleanup.js")
+        end
+
+        translations.each { |country|
+          code = country[0]
+          LOGGER.info " * uploading tmp/ba-" + code+ ".js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]}tag-#{code} passive : #{ftp.passive}"
+          js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba-" + code + ".js"
+          ftp.chdir(ftp_config["remote_dir"] + "tag-" + code + "/")
+          ftp.puttextfile(js_file, "ba.js")
+          LOGGER.info " * uploading tmp/mobile.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]}tag-#{code} passive : #{ftp.passive}"
+          ftp.chdir(ftp_config["remote_dir"] + "tag-" + code + "/")
+          ftp.puttextfile(mobile_js_file, "mobile.js")
+        }
+      end
+
+      LOGGER.info " * file(s) uploaded successfully"
+
+      if cap_env != "staging" and ftp_config["akamai_user"] then
+        purge_akamai(ftp_config["akamai_user"], ftp_config["akamai_pass"], translations)
+        LOGGER.info " * purged akamai cache"
+      end
+    end
+
+    def self.purge_akamai(user, pass, translations = nil)
+      wsdl_url = "https://ccuapi.akamai.com/ccuapi-axis.wsdl"
+      client = SOAP::WSDLDriverFactory.new(wsdl_url).create_rpc_driver
+
+      if translations.nil?
+        LOGGER.info " * purging file http://c.betrad.com/surly.js"
+        purge_files = ['http://c.betrad.com/surly.js']
+      else
+        purge_files = []
+        translations.each { |country|
+          LOGGER.info " * purging file #{AKAMAI_BASE_URL}tag-#{country[0]}/ba.js"
+          purge_files.push("#{AKAMAI_BASE_URL}tag-#{country[0]}/ba.js")
+          LOGGER.info " * purging file #{AKAMAI_BASE_URL}tag-#{country[0]}/mobile.js"
+          purge_files.push("#{AKAMAI_BASE_URL}tag-#{country[0]}/mobile.js")
+        }
+      end
+
+      client.purgeRequest(user,
+      pass,
+      '',
+      ['type=arl',
+        "email-notification=#{Evidon::Hooks::ALERTS_EMAIL}"],
+        purge_files
+      )
+    end
+    
+    def self.purge_akamai_flash(user, pass)
+      wsdl_url = "https://ccuapi.akamai.com/ccuapi-axis.wsdl"
+      client = SOAP::WSDLDriverFactory.new(wsdl_url).create_rpc_driver
+      client.purgeRequest(user,
+      pass,
+      '',
+      ['type=arl',
+        "email-notification=#{Evidon::Hooks::ALERTS_EMAIL}"],
+      ['http://c.betrad.com/f3/n.swf', 'http://c.betrad.com/f3/h.swf', 'http://c.betrad.com/f3/m.swf', 'http://c.betrad.com/f3/s.swf', 'http://c.betrad.com/f3/v.swf', 'http://c.betrad.com/f2/h.swf', 'http://c.betrad.com/f2/m.swf', 'http://c.betrad.com/f2/n.swf', 'http://c.betrad.com/f2/s.swf', 'http://c.betrad.com/f2/v.swf']
+      )
+    end
+    
+    def self.update_flash(cap_env, scm_username = nil, scm_password = nil)
+      @as2_repo = "https://code.betteradvertising.com/repos/notice-flash/trunk/as2/swf"
+      @as3_repo = "https://code.betteradvertising.com/repos/notice-flash/trunk/as3/swf"
+      
+      @as2dest = PRIVACY_WEB_ROOT_DIR + "/as2"
+      @as3dest = PRIVACY_WEB_ROOT_DIR + "/as3"
+      
+      @cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''
+      
+      LOGGER.info " * fetching #{@as2_repo}"
+      `svn co #{@cred} #{@as2_repo} #{@as2dest}`
+      LOGGER.info " * fetching #{@as3_repo}"
+      `svn co #{@cred} #{@as3_repo} #{@as3dest}` 
+      
+      ftp_config = load_ftp_config(cap_env)
+      @archive_dir = Time.now.strftime("%Y%m%d")
+
+      BasicSocket.do_not_reverse_lookup = true
+      
+      Net::FTP.open(ftp_config["host"], ftp_config["user"], ftp_config["pass"]) do |ftp|
+        ftp.passive = true if ftp_config["passive"]
+        
+        LOGGER.info " * uploading as2/*.swf to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_as2_dir"]} passive : #{ftp.passive}"
+        
+        ftp.chdir(ftp_config["remote_as2_dir"])
+        ftp.mkdir(@archive_dir)
+        ftp.rename('h.swf', @archive_dir+'/h.swf')
+        ftp.rename('m.swf', @archive_dir+'/m.swf')
+        ftp.rename('n.swf', @archive_dir+'/n.swf') 
+        ftp.rename('s.swf', @archive_dir+'/s.swf')
+        ftp.rename('v.swf', @archive_dir+'/v.swf')
+        ftp.putbinaryfile(@as2dest+'/h.swf')
+        ftp.putbinaryfile(@as2dest+'/m.swf')
+        ftp.putbinaryfile(@as2dest+'/n.swf')
+        ftp.putbinaryfile(@as2dest+'/s.swf')
+        ftp.putbinaryfile(@as2dest+'/v.swf')
+        
+        LOGGER.info " * as2 files uploaded successfully"
+        
+        LOGGER.info " * uploading as3/*.swf to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_as3_dir"]} passive : #{ftp.passive}"
+        
+        ftp.chdir(ftp_config["remote_as3_dir"])
+        ftp.mkdir(@archive_dir)
+        ftp.rename('h.swf', @archive_dir+'/h.swf')
+        ftp.rename('m.swf', @archive_dir+'/m.swf')
+        ftp.rename('n.swf', @archive_dir+'/n.swf') 
+        ftp.rename('s.swf', @archive_dir+'/s.swf')
+        ftp.rename('v.swf', @archive_dir+'/v.swf')
+        ftp.putbinaryfile(@as3dest+'/h.swf')
+        ftp.putbinaryfile(@as3dest+'/m.swf')
+        ftp.putbinaryfile(@as3dest+'/n.swf')
+        ftp.putbinaryfile(@as3dest+'/s.swf')
+        ftp.putbinaryfile(@as3dest+'/v.swf')
+        
+        LOGGER.info " * as3 files uploaded successfully"
+        
+      end
+
+      if cap_env != "staging" and ftp_config["akamai_user"] then
+        purge_akamai_flash(ftp_config["akamai_user"], ftp_config["akamai_pass"])
+        LOGGER.info " * purged akamai flash cache"
+      end
+      
+    end
+
+    def self.update_surly(cap_env, scm_username = nil, scm_password = nil)
+      # SET UP
+      @surly_repo = "https://code.betteradvertising.com/repos/notice-js/trunk/surly/surly.js"
+
+      @cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''
+
+			# SVN REVISION
+			`svn info #{@cred} #{@surly_repo}` =~ /Last Changed Rev: (\d+)/
+      surly_rev = $1
+
+      # SVN DOWNLOAD
+      LOGGER.info " * fetching #{@surly_repo}"
+      js = `svn cat #{@cred} #{@surly_repo}`
+
+      if js.nil? or js.empty? then
+        LOGGER.info "ERROR downloading surly file, please try again."
+        exit
+      end
+
+      # CLEANUP
+      output = []
+      output << "var _surly_rev = 'r#{surly_rev}';";
+      skip_next = false
+
+      js.lines { |line|
+        line.strip!
+        next if line.empty?
+
+        if skip_next then
+          skip_next = false if line.include? "*/"
+        next
+        end
+
+        next if line =~ %r{^//}
+
+        if line =~ %r{^/\*} then
+          next if line.include? "*/"
+        skip_next = true
+        next
+        end
+
+        # remove inline // style comments
+        line = line[0..line.index(" //")] if line.include? " //"
+
+        output << line
+      }
+
+      js = output.join("\n").gsub!(/[\n]+/, "")
+
+      # link to the right file.
+      if cap_env == "staging"
+        js.gsub!(/_surly_url = \(\("https:" == document\.location\.protocol\) \? "https:\/\/a248\.e\.akamai\.net\/betterad\.download\.akamai\.com\/91609" : "http:\/\/c\.betrad\.com"\);/, "_surly_url = ( ('https:' == document.location.protocol) ? 'https://' : 'http://' ) + 'staginginfo.evidon.com/ftp/staging';")
+        js.gsub!(/\/geo\/ba\.js/, "/ba.min.js")
+      end
+
+      # SAVE
+      surly_file = PRIVACY_WEB_ROOT_DIR + "/tmp/surly.js"
+      File.open(surly_file, 'w') { |file| file.write(js) }
+
+      compressed = Packr.pack(js, :shrink_vars => true)
+      File.open(surly_file, 'w'){ |f| f.write(compressed) }
+
+      LOGGER.info " * cached at #{surly_file}"
+      ftp_config = load_ftp_config(cap_env)
+
+      BasicSocket.do_not_reverse_lookup = true
+
+      Net::FTP.open(ftp_config["host"], ftp_config["user"], ftp_config["pass"]) do |ftp|
+        ftp.passive = true if ftp_config["passive"]
+
+        LOGGER.info " * uploading tmp/surly.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}#{ftp_config["remote_dir"]} passive : #{ftp.passive}"
+        
+        ftp.chdir(ftp_config["remote_root"])
+        ftp.puttextfile(surly_file)
+        
+        LOGGER.info " * file(s) uploaded successfully"
+      end
+
+      if cap_env != "staging" and ftp_config["akamai_user"] then
+        purge_akamai(ftp_config["akamai_user"], ftp_config["akamai_pass"])
+        LOGGER.info " * purged akamai cache"
+      end
+    end
+
+    def self.kill_js(cap_env, repository, scm_username, scm_password)
+      repository.chomp!("/")
+      @do_nothing_repo = "#{repository}/js/ba-donothing.js"
+      @cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''
+      
+      LOGGER.info " * fetching #{@do_nothing_repo}"
+      do_nothing_js = `svn cat #{@cred} #{@do_nothing_repo}`
+      
+      if do_nothing_js.nil? or do_nothing_js.empty? then
+        LOGGER.info "ERROR: ba-donothing.js not found! (@ #{@do_nothing_repo})"
+        exit
+      end
+      
+      js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba-donothing.js"
+      File.open(js_file, 'w') { |file| file.write(do_nothing_js) }
+      LOGGER.info " * cached at #{js_file}"
+      
+      translations = Evidon::TagJS.load_translations(cap_env)
+      
+      ftp_config = load_ftp_config(cap_env)
+
+      BasicSocket.do_not_reverse_lookup = true
+
+      LOGGER.info " * replacing all ba.js files with ba-donothing.js"
+      Net::FTP.open(ftp_config["host"], ftp_config["user"], ftp_config["pass"]) do |ftp|
+        ftp.passive = true if ftp_config["passive"]
+        translations.each { |country|
+          code = country[0]
+          LOGGER.info " * pasting ba-donothing.js to ftp://#{ftp_config["user"]}@#{ftp_config["host"]}/tag-#{code} passive passive : #{ftp.passive}"
+          ftp.chdir(ftp_config["remote_dir"] + "tag-" + code + "/")
+          ftp.puttextfile(js_file, "ba.js")
+        }
+      end
+      LOGGER.info " * ba.js replaced successfully"
+
+      if cap_env != "staging" and ftp_config["akamai_user"] then
+        LOGGER.info " * purging akamai cache"
+        purge_akamai(ftp_config["akamai_user"], ftp_config["akamai_pass"], translations)
+        LOGGER.info " * purged akamai cache"
+      end
+    end
+
+  end # FTP
+
+end # Evidon
+

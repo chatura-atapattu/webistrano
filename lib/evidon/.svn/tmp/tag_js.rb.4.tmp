@@ -1,0 +1,263 @@
+require 'digest'
+require 'rubygems'
+require 'sequel'
+require 'htmlentities'
+
+module Evidon
+
+  module TagJS
+
+    # RAILS_ROOT not available from capistrano
+    PRIVACY_WEB_ROOT_DIR = '/u/apps/privacy_web/current'
+    CRED = "--username %u --password %p"
+
+    def self.db_conn(stage)
+      temp_db = nil
+      if stage == "staging"
+        temp_db = Sequel.connect(:adapter => 'mysql', :user => 'labtech', :host => 'staging.betteradvertising.com', :database => 'ba',:password=>'@fr4nki3!', :encoding => 'utf8')
+      elsif stage == "production"
+        temp_db = Sequel.connect(:adapter => 'mysql', :user => 'ba_web', :host => 'db01.betteradvertising.com', :database => 'ba',:password=>'web_user', :encoding => 'utf8')
+      else
+        LOGGER.info "Unknown stage for db access."
+        exit
+      end
+      return temp_db
+    end
+    
+    def self.get_sizes
+      @ar = ''
+      conn = db_conn("production")
+      conn.fetch('SELECT * FROM ad_size') do |row|
+        @ar += "{i:#{row[:as_id]},w:#{row[:as_width]},h:#{row[:as_height]},m:#{row[:as_mini]}},"
+      end
+      @ar = '[' + @ar[0, @ar.length - 1] + ']'
+      return @ar;
+    end
+
+    def self.set_repository(repository = "https://code.betteradvertising.com/repos/notice-js/trunk")
+      @js_repo = "#{repository}/js/ba.js"
+      @mobile_repo = "#{repository}/mobile/mobile.js"
+      @css_repo = "#{repository}/css"
+    end
+
+    def self.get_tag_revision
+      `svn info #{@cred} #{@js_repo}` =~ /Last Changed Rev: (\d+)/
+      $1
+    end
+
+    def self.fetch_js(stage, credentials = nil)
+      LOGGER.info " * fetching #{@js_repo}"
+      if credentials.nil?
+        js = `svn cat #{@cred} #{@js_repo}`
+      else
+        js = `svn cat #{credentials} #{@js_repo}`
+      end
+      
+
+      if js.nil? or js.empty? then
+        LOGGER.info "ERROR downloading file, please try again."
+        exit
+      end
+
+      # inject CSS into JS file
+      fetch_css(js)
+
+      # inject / replace sizes
+      js.gsub!(/sizes = .*\}\],/, 'sizes = ' + get_sizes + ',')
+
+      # inject svn rev
+      js.gsub!(/version = '[r0-9]+'/, "version = '#{get_tag_revision}'")
+
+      js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/ba.js"
+      File.open(js_file, 'w') { |file| file.write(js) }
+      LOGGER.info " * cached at #{js_file}"
+
+      return js
+    end
+    
+    def self.fetch_mobile_js(stage, credentials = nil)
+      LOGGER.info " * fetching #{@mobile_repo}"
+      if credentials.nil?
+        mobile_js = `svn cat #{@cred} #{@mobile_repo}`
+      else
+        mobile_js = `svn cat #{credentials} #{@mobile_repo}`
+      end
+
+      if mobile_js.nil? or mobile_js.empty? then
+        LOGGER.info "ERROR downloading file, please try again."
+        exit
+      end
+      
+      mobile_js.gsub!(/version = '[r0-9]+'/, "version = '#{get_tag_revision}'")
+
+      mobile_js_file = PRIVACY_WEB_ROOT_DIR + "/tmp/mobile.js"
+      File.open(mobile_js_file, 'w') { |file| file.write(mobile_js) }
+      LOGGER.info " * cached at #{mobile_js_file}"
+
+      return mobile_js
+    end
+
+    def self.fetch_css(js)
+      %w(common 1 2 5 6).each do |c|
+        url = "#{@css_repo}/#{c}.css"
+        LOGGER.info " * fetching #{url}"
+
+        # fetch from svn
+        tmp = "#{PRIVACY_WEB_ROOT_DIR}/tmp/#{c}.css"
+        `svn cat #{@cred} #{url} > #{tmp}`
+
+        # minify
+        css = `java -jar #{PRIVACY_WEB_ROOT_DIR}/tools/yuicompressor-*.jar --type css #{tmp}`
+        css.gsub!('"', '\"')
+
+        var = "CSS_#{c.upcase}"
+        js.gsub!("#{var}:null,", "#{var}:\"#{css}\",")
+      end
+    end
+
+    def self.load_translations(stage)
+      translations = Hash.new
+      conn = db_conn(stage)
+      countries = conn[:country].filter(:country_tag_supported => 1).all
+      countries.each do |country|
+        translation = conn[:translation].filter(:translation_language_id => country[:country_default_language_id]).first
+        parsed_translation = Hash.new
+        parsed_translation['is_eu'] = country[:country_is_eu]
+        parsed_translation['domain'] = country[:country_domain]
+        parsed_translation['choices_link'] = country[:country_choices_link]
+        parsed_translation['country_icon'] = translation[:translation_icon]
+        parsed_translation['generic_1'] = translation[:translation_generic_1]
+        parsed_translation['generic_2'] = translation[:translation_generic_2]
+        parsed_translation['generic_3'] = translation[:translation_generic_3]
+        parsed_translation['generic_4'] = translation[:translation_generic_4]
+        parsed_translation['generic_5'] = translation[:translation_generic_5]
+        parsed_translation['generic_6'] = translation[:translation_generic_6]
+        parsed_translation['link_1'] = translation[:translation_link_1]
+        parsed_translation['link_2'] = translation[:translation_link_2]
+        parsed_translation['link_3'] = translation[:translation_link_3]
+        parsed_translation['footer'] = translation[:translation_footer]
+        translations[country[:country_code]] = parsed_translation
+      end
+      
+      return translations
+    end
+
+    def self.substitute_localized_text(js, coder, country, localized_text)
+      # Replace L1
+      js.gsub!(/country = '.*',/, "country = '" + country + "',")
+      js.gsub!(/DOMAIN_INFO = \'http:\/\/.*\'\,/, "DOMAIN_INFO = '" + localized_text["domain"] + "',")
+      if country != 'us'
+        js.gsub!( /link\(\'bap\-link\-2\-\' \+ pageId\, .*\);/, "link('bap-link-2-' + pageId, '" + localized_text["choices_link"] + "');")
+      end
+      js.gsub!( /cicon = \'\'\,/, "cicon = '" + localized_text["country_icon"] + "',")
+      
+      # Replace skip L2 if EU
+      if (localized_text["is_eu"])
+        js.gsub!(/BAP\.options\[pageId\]\.skipL2 = \(cud\.skip_L2 \|\| isSkipper\(BAP\.options\[pageId\].ns\)\);/, 'BAP.options[pageId].skipL2 = true;')
+      end
+      
+      # Replace L2
+      js.gsub!(/sg1 = \'This ad has been matched to your interests. It was selected for you based on your browsing activity.\',/, "sg1 = '" + coder.encode(localized_text["generic_1"], :decimal) + "',")
+      js.gsub!(/sg2 = \'This ad may have been matched to your interests based on your browsing activity.\',/, "sg2 = '" + coder.encode(localized_text["generic_2"], :decimal) + "',")
+      js.gsub!(/sg3 = \'helped\',/, "sg3 = '" + coder.encode(localized_text["generic_3"], :decimal) + "',")
+      js.gsub!(/sg4 = \'determine that you might be interested in an ad like this.\',/, "sg4 = '" + coder.encode(localized_text["generic_4"], :decimal) + "',")
+      js.gsub!(/sg5 = \'select this ad for you.\';/, "sg5 = '" + coder.encode(localized_text["generic_5"], :decimal) + "';")
+      js.gsub!(/sg6 = \'selected this ad for you.\';/, "sg6 = '" + coder.encode(localized_text["generic_6"], :decimal) + "';")
+      js.gsub!(/sm = \'More information &amp; opt-out options\',/, "sm = '" + coder.encode(localized_text["link_1"], :decimal) + "',")
+      js.gsub!(/sw = \'What is interest-based advertising\?',/, "sw = '" + coder.encode(localized_text["link_2"], :decimal) + "?',")
+      js.gsub!(/sl = \'Learn about your choices\',/, "sl = '" + coder.encode(localized_text["link_3"], :decimal) + "',")
+      js.gsub!(/se = \'Privacy controls by Evidon&#153;\',/, "se = '" + coder.encode(localized_text["footer"], :decimal) + "&#153;',")
+
+      return js
+    end
+
+    def self.prepare_js(stage, repository = nil, scm_username = nil, scm_password = nil)
+      repository.chomp!("/")
+      set_repository(repository)
+
+      @cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''
+      
+      fetch_js(stage)
+      fetch_mobile_js(stage)
+    end
+
+    def self.update_erb(stage, dry_run = false, repository = nil, scm_username = nil, scm_password = nil)
+      js = prepare_js(stage, repository, scm_username, scm_password)
+      
+      translations = load_translations(stage)
+
+      #ret = js.gsub!( %r{document\.write\('<sc'\+'ript type="text/javascript" src="' \+ DOMAIN_JSON \+ bap_url \+ '\.js\?r=' \+ Math\.random\(\) \+ '"></scr'\+'ipt>'\);}, "<%= @json %>" )
+      ret = js.gsub!( %r{i = document\.createElement\("script"\);}, " " )
+      
+      ret = js.gsub!( %r{body\.appendChild\(i\);}, " " )
+      
+      ret = js.gsub!( %r{i\.src = DOMAIN_JSON \+ bap_url \+ '\.js\?r=' \+ Math\.random\(\);}, "<%= raw @json %>" )
+                         
+      #js.gsub!("DOMAIN_PROTOCOL + \"c.betrad.com/", "\"/c/betrad/")
+      js.gsub!("detection = 'on'", "detection = 'tagui'")
+      js.gsub!("logging = true", "logging = false")
+
+      if ret.nil?
+        LOGGER.info "ERROR: unable to locate string for substituting <%= raw @json %> tag in template;"
+        LOGGER.info "    the format may have changed."
+        exit
+      end
+
+      svn_update = false
+
+      coder = HTMLEntities.new
+      # Generate versions for all countries (including US)
+      translations.each { |country|
+        code = country[0]
+        localized_text = translations[code]
+        
+        localized_js = substitute_localized_text(String.new(js), coder, code, localized_text)
+        
+        erb_path = "app/views/tags/_tag_code_#{code}.js.erb"
+        erb_file = PRIVACY_WEB_ROOT_DIR + "/#{erb_path}"
+        
+        # grab latest ERB
+        system("svn up #{@cred} #{PRIVACY_WEB_ROOT_DIR}")
+        
+        # compare to ERB file
+        js_md5 = Digest::MD5.hexdigest(localized_js)
+        erb_md5 = Digest::MD5.hexdigest(File.new(erb_file).read)
+        
+        if js_md5 == erb_md5 then
+          # no need to update
+          LOGGER.info " * no change for #{code}, skipping update"
+        else
+          LOGGER.info " * file contents differ, updating _tag_code_#{code}.js.erb"
+          
+          unless dry_run
+            File.open(erb_file, 'w') { |file| file.write(localized_js) }
+            LOGGER.info " * wrote #{erb_file}, queued for commit"
+
+            svn_update = true
+          end
+        end
+      }
+      
+      svn_commit_result = true
+      if svn_update then
+        rev = get_tag_revision()
+        ver_file = "#{PRIVACY_WEB_ROOT_DIR}/VERSION_JS"
+        erb_files = "#{PRIVACY_WEB_ROOT_DIR}/app/views/tags/_tag_code_*.js.erb"
+        LOGGER.info " * updating version file"
+        File.open(ver_file, 'w') { |file| file.write(rev) }
+        LOGGER.info " * committing files..."
+        svn_commit_output = `svn ci #{@cred} -m 'updated _tag_code_*.js.erb to r#{rev} from notice-js repository' #{ver_file} #{erb_files} 2>&1`
+        svn_commit_result = $?.exitstatus == 0 ? true : false
+        if svn_commit_result
+          LOGGER.info " * commit successful"
+        else
+          LOGGER.info "ERROR commiting files"
+          LOGGER.info "DETAILS: #{svn_commit_output}"
+        end
+      end
+      return svn_commit_result      
+    end
+
+  end # module TagJS
+
+end # module Evidon

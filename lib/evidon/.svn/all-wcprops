@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/webistrano/!svn/ver/113/trunk/lib/evidon
+END
+clean_js.rb
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/webistrano/!svn/ver/92/trunk/lib/evidon/clean_js.rb
+END
+hooks.rb
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/webistrano/!svn/ver/107/trunk/lib/evidon/hooks.rb
+END
+tag_js.rb
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/repos/webistrano/!svn/ver/109/trunk/lib/evidon/tag_js.rb
+END
+ftp.rb
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/repos/webistrano/!svn/ver/113/trunk/lib/evidon/ftp.rb
+END

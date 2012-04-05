@@ -1,0 +1,116 @@
+#!/usr/bin/ruby
+require 'rubygems'
+require 'stringio'
+require 'logger'
+require 'pony'
+require 'backports'
+require_relative 'tag_js'
+
+module Evidon
+
+  module Hooks
+
+    ALERTS_EMAIL = 'alerts@evidon.com'
+    NOTICE_JS_BRANCHES_REPO = 'https://code.betteradvertising.com/repos/notice-js/branches/'
+    PRIVACY_WEB_BRANCHES_REPO = 'https://code.betteradvertising.com/repos/privacy_web/branches/'
+    CRED = "--username %u --password %p"
+    
+    def self.update(stage, repository, scm_username, scm_password)
+      repository.chomp!("/")
+      if repository.include? "branches"
+        branch = repository.split("branches/")[1]
+        success = update_branch(branch, stage, scm_username, scm_password)
+      end
+    end
+    
+    def self.update_branch(branch, stage, scm_username = nil, scm_password = nil, success = true)
+      LOGGER.info " * processing branch #{branch}"
+      branch_repo = "#{PRIVACY_WEB_BRANCHES_REPO}#{branch}"
+      
+      cred = scm_username && scm_password ? CRED.sub('%u', scm_username).sub('%p', scm_password) : ''      
+      branch_contents = `svn ls #{cred} #{branch_repo}`
+      
+      if branch_contents.empty?
+        LOGGER.info "ERROR: #{branch_repo} does not exist!"
+        success = false
+      else
+        LOGGER.info " * switch to repository #{branch_repo}"
+        command_output = `svn switch #{cred} #{branch_repo} #{Evidon::TagJS::PRIVACY_WEB_ROOT_DIR} 2>&1`
+        if $?.exitstatus  != 0
+          LOGGER.info "ERROR: #{command_output}"
+        end
+        
+        begin
+          success &&= Evidon::TagJS.update_erb(stage, false, "#{NOTICE_JS_BRANCHES_REPO}#{branch}", scm_username, scm_password)
+        rescue Exception => exception
+          LOGGER.info "ERROR: #{exception.to_s}"
+          LOGGER.info "ERROR: #{exception.backtrace}"
+          success &&= false
+        else
+          LOGGER.info " * completed update of branch #{branch} tag erb files!"
+        end
+      end
+      return success
+    end
+    
+    def self.run(hook_arugments, string_logger)
+      if hook_arugments.count != 4
+        @logger.error "ERROR: Incorrect number of parameters to update_urb post commit hook for notice-js"
+        Pony.mail(
+          :to => "#{ALERTS_EMAIL}",
+          :from => "svn@evidon.com",
+          :subject => 'ERB Update - FAILED',
+          :body => string_logger.string
+        )
+        exit
+      end
+      
+      repo = hook_arugments[0]
+      rev = hook_arugments[1]
+      scm_username = hook_arugments[2]
+      scm_password = hook_arugments[3]
+      
+      author = `svnlook author -r #{rev} #{repo}`
+      author.strip!
+      changed_files = `svnlook changed -r #{rev} #{repo}`
+      
+      success = true
+      processed_branches = Array.new
+      
+      changed_files.each_line do |file_path|
+        if file_path.include? "branches"
+          branch = file_path.split("/")[1]
+          if !processed_branches.include? branch
+            success = update_branch(branch, "staging", scm_username, scm_password, success)
+            processed_branches.push(branch)
+          end
+        end
+      end
+      
+      if processed_branches.length > 0
+        Pony.mail(
+          :to => "#{ALERTS_EMAIL}",
+          :from => "#{author}@evidon.com",
+          :subject => "ERB Update - #{success ? "SUCCESS" : "FAILED"} [#{author}:#{rev}]",
+          :body => string_logger.string
+        )
+      end
+      
+    end
+    
+  end
+  
+end
+
+if __FILE__ == $0
+  string_logger = StringIO.new
+  logger = Logger.new string_logger
+  logger.formatter = proc { |severity, datetime, progname, msg|
+    "[%s] [%5s] : %s\n" % [datetime.strftime("%m-%d-%Y %H:%M"), severity, msg]
+  }
+  
+  Evidon::TagJS::LOGGER = logger
+  Evidon::Hooks::LOGGER = logger
+  
+  Evidon::Hooks.run(ARGV, string_logger)
+end
