@@ -11,7 +11,7 @@
           <th width="39%">Name</th>
           <th width="60%">Description</th>
         </tr>
-        <% for recipe in Recipe.all.order('name ASC') %>
+        <% for recipe in Recipe.order('name ASC') %>
           <tr class="<%= cycle :even, :odd, :name => 'recipes'  %>">
             <td><input type="checkbox" value="<%=h recipe.id %>" name="stage[recipe_ids][]" id="stage_recipe_ids_<%=h recipe.id %>" <%= @stage.recipes.include?(recipe) ? 'checked="checked"' : '' %>/></td>
             <td><%= link_to h(recipe.name), recipe_path(recipe) %></td>

@@ -1,4 +1,6 @@
 Webistrano::Application.routes.draw do
+  devise_for :users
+
   match '' => 'projects#dashboard', :as => :home
   match ':controller/service.wsdl' => '#wsdl'
   

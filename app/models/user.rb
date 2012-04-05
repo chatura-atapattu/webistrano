@@ -1,5 +1,11 @@
 require 'digest/sha1'
 class User < ActiveRecord::Base
+  # Include default devise modules. Others available are:
+  # :token_authenticatable, :encryptable, :confirmable, :lockable, :timeoutable and :omniauthable
+  devise :database_authenticatable, :registerable, :rememberable, :validatable, :encryptable, :encryptor => :restful_authentication_sha1
+
+  # Setup accessible (or protected) attributes for your model
+  attr_accessible :email, :password, :password_confirmation, :remember_me
   has_many :deployments, :dependent => :nullify, :order => 'created_at DESC'
   
   # Virtual attribute for the unencrypted password
@@ -41,11 +47,11 @@ class User < ActiveRecord::Base
 
   # Encrypts the password with the user salt
   def encrypt(password)
-    self.class.encrypt(password, salt)
+    self.class.encrypt(password, password_salt)
   end
 
   def authenticated?(password)
-    crypted_password == encrypt(password)
+    encrypted_password == encrypt(password)
   end
 
   def remember_token?
@@ -64,13 +70,13 @@ class User < ActiveRecord::Base
   def remember_me_until(time)
     self.remember_token_expires_at = time
     self.remember_token            = encrypt("#{email}--#{remember_token_expires_at}")
-    save(false)
+    save(:validate=> false)
   end
 
   def forget_me
     self.remember_token_expires_at = nil
     self.remember_token            = nil
-    save(false)
+    save(:validate=> false)
   end
   
   def admin?
@@ -92,7 +98,7 @@ class User < ActiveRecord::Base
   end
   
   def recent_deployments(limit=3)
-    self.deployments.all.order('created_at DESC').limit(limit) #find(:all, :limit => limit, :order => 'created_at DESC')
+    self.deployments.order('created_at DESC').limit(limit) #find(:all, :limit => limit, :order => 'created_at DESC')
   end
   
   def disabled?
@@ -112,13 +118,11 @@ class User < ActiveRecord::Base
     # before filter 
     def encrypt_password
       return if password.blank?
-      self.salt = Digest::SHA1.hexdigest("--#{Time.now.to_s}--#{login}--") if new_record?
-      self.crypted_password = encrypt(password)
+      self.password_salt = Digest::SHA1.hexdigest("--#{Time.now.to_s}--#{login}--") if new_record?
+      self.encrypted_password = encrypt(password)
     end
     
     def password_required?
-      WebistranoConfig[:authentication_method] != :cas && (crypted_password.blank? || !password.blank?)
+      WebistranoConfig[:authentication_method] != :cas && (encrypted_password.blank? || !password.blank?)
     end
-
-    
 end

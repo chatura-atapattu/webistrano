@@ -11,7 +11,7 @@
 #
 # It's strongly recommended to check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20110512144542) do
+ActiveRecord::Schema.define(:version => 20120405152637) do
 
   create_table "configuration_parameters", :force => true do |t|
     t.string   "name"
@@ -121,15 +121,16 @@ ActiveRecord::Schema.define(:version => 20110512144542) do
   create_table "users", :force => true do |t|
     t.string   "login"
     t.string   "email"
-    t.string   "crypted_password",          :limit => 40
-    t.string   "salt",                      :limit => 40
+    t.string   "encrypted_password",        :limit => 128, :default => "",    :null => false
+    t.string   "password_salt",                            :default => "",    :null => false
     t.datetime "created_at"
     t.datetime "updated_at"
     t.string   "remember_token"
     t.datetime "remember_token_expires_at"
-    t.integer  "admin",                                   :default => 0
-    t.string   "time_zone",                               :default => "UTC"
+    t.integer  "admin",                                    :default => 0
+    t.string   "time_zone",                                :default => "UTC"
     t.datetime "disabled"
+    t.datetime "remember_created_at"
   end
 
   add_index "users", ["disabled"], :name => "index_users_on_disabled"

@@ -30,6 +30,9 @@
         <%= yield :flash_content %>
         <%= yield :page_title %>
 
+        <p class="notice"><%= notice %></p>
+        <p class="alert"><%= alert %></p>
+
         <% unless flash[:notice].blank? %>
           <%= nice_flash(flash[:notice]) %>
         <% end %>

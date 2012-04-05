@@ -4,7 +4,7 @@ class HostsController < ApplicationController
   # GET /hosts
   # GET /hosts.xml
   def index
-    @hosts = Host.all.order('name ASC') #find(:all, :order => 'name ASC')
+    @hosts = Host.order('name ASC') #find(:all, :order => 'name ASC')
 
     respond_to do |format|
       format.html # index.rhtml
