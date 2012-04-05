@@ -55,7 +55,7 @@
   <%= render :partial => 'preview', :locals => {:recipe => @recipe} %>
 </fieldset>
 
-<% content_for(:breadcrumb) do %>
+<%= content_for(:breadcrumb) do %>
   <% breadcrumb_box do %>
     <%= link_to "Manage recipes", recipes_path, :style => "float:right", :class => "arrow_link" %>
     <%= link_to "Recipes", recipes_path %> &gt; 
@@ -63,7 +63,7 @@
   <% end %>
 <% end %>
 
-<% content_for(:page_title) do %>
+<%= content_for(:page_title) do %>
   <% @page_title = "Recipe #{h(@recipe.name)}" %>
   <h2>Recipe <%= link_to h(@recipe.name), recipe_path(@recipe) %></h2>
 <% end %>

@@ -5,7 +5,7 @@ class ProjectsController < ApplicationController
   
   # GET /projects/dashboard
   def dashboard
-    @deployments = Deployment.find(:all, :limit => 3, :order => 'created_at DESC')
+    @deployments = Deployment.all.order('created_at DESC').limit(3) #find(:all, :limit => 3, :order => 'created_at DESC')
 
     respond_to do |format|
       format.html # dashboard.rhtml
@@ -15,7 +15,7 @@ class ProjectsController < ApplicationController
   # GET /projects
   # GET /projects.xml
   def index
-    @projects = Project.find(:all, :order => 'name ASC')
+    @projects = Project.all.order('name ASC') #find(:all, :order => 'name ASC')
 
     respond_to do |format|
       format.html # index.rhtml

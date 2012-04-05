@@ -1,6 +1,6 @@
 <% flashed_errors(:host) %>
 
-<% form_for(:host, :url => hosts_path) do |f| %>
+<%= form_for(:host, :url => hosts_path) do |f| %>
   <p>
     <b>Name (DNS name or IP address)</b><br />
     <%= f.text_field :name, :style => 'width: 330px' %>
@@ -13,7 +13,7 @@
   </p>
 <% end %>
 
-<% content_for(:breadcrumb) do %>
+<%= content_for(:breadcrumb) do %>
   <% breadcrumb_box do %>
     <%= link_to "Manage hosts", hosts_path, :style => "float:right", :class => "arrow_link" %>
     <%= link_to "Hosts", hosts_path %> &gt; 
@@ -21,7 +21,7 @@
   <% end %>
 <% end %>
 
-<% content_for(:page_title) do %>
+<%= content_for(:page_title) do %>
   <% @page_title = "New host" %>
   <h2>New host</h2>
 <% end %>

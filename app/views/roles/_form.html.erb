@@ -43,7 +43,7 @@
   <%= check_box 'role', 'no_symlink', :style =>'' %>
 </p>
 
-<% content_for(:page_scripts) do %>
+<%= content_for(:page_scripts) do %>
   <script type="text/javascript">
   
     Event.observe(window, 'load', function(){

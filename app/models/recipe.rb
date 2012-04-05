@@ -7,7 +7,7 @@ class Recipe < ActiveRecord::Base
 
   attr_accessible :name, :body, :description
   
-  named_scope :ordered, :order => "name ASC"
+  scope :ordered, :order => "name ASC"
   
   version_fu rescue nil # hack to silence migration errors when the original table is not there
   
@@ -32,7 +32,7 @@ class Recipe < ActiveRecord::Base
      errors.add(:body, "syntax error at line: #{line}") unless line.nil?
    end
   rescue => e
-    RAILS_DEFAULT_LOGGER.error "Error while validating recipe syntax of recipe #{self.id}: #{e.inspect} - #{e.backtrace.join("\n")}"
+    Rails.logger.error "Error while validating recipe syntax of recipe #{self.id}: #{e.inspect} - #{e.backtrace.join("\n")}"
   end
  
 end

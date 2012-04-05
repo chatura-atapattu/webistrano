@@ -110,7 +110,7 @@ class Stage < ActiveRecord::Base
   end
   
   def recent_deployments(limit=3)
-    self.deployments.find(:all, :limit => limit, :order => 'deployments.created_at DESC')
+    self.deployments.all.order('deployments.created_at DESC').limit(limit) #find(:all, :limit => limit, :order => 'deployments.created_at DESC')
   end
   
   # returns a better form of the stage name for use inside Capistrano recipes
@@ -126,7 +126,7 @@ class Stage < ActiveRecord::Base
     begin
       deployer.list_tasks.collect { |t| {:name => t.fully_qualified_name, :description => t.description} }.delete_if{|t| t[:name] == 'shell' || t[:name] == 'invoke'}
     rescue Exception => e
-      RAILS_DEFAULT_LOGGER.error("Problem listing tasks of stage #{id}: #{e} - #{e.backtrace.join("\n")} ")
+      Rails.logger.error("Problem listing tasks of stage #{id}: #{e} - #{e.backtrace.join("\n")} ")
       [{:name => "Error", :description => "Could not load tasks - syntax error in recipe definition?"}]
     end
   end

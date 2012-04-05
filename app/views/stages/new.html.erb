@@ -1,6 +1,6 @@
 <% flashed_errors(:stage) %>
 
-<% form_for(:stage, :url => project_stages_path(current_project)) do |f| %>
+<%= form_for(:stage, :url => project_stages_path(current_project)) do |f| %>
   
   <%= render(:partial => 'form' ) %>
   
@@ -11,7 +11,7 @@
   </p>
 <% end %>
 
-<% content_for(:breadcrumb) do %>
+<%= content_for(:breadcrumb) do %>
   <% breadcrumb_box do %>
     <%= link_to "Back to project", project_path(current_project), :style => "float:right", :class => "arrow_link" %>
     <%= link_to "Projects", projects_path %> &gt; 
@@ -20,7 +20,7 @@
   <% end %>
 <% end %>
 
-<% content_for(:page_title) do %>
+<%= content_for(:page_title) do %>
   <% @page_title = "New stage for project #{h(current_project.name)}" %>
   <h2>New stage</h2>
 <% end %>

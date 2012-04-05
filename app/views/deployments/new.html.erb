@@ -1,12 +1,12 @@
 <% if current_stage.locked? %>
-  <% content_for(:flash_content) do %>
+  <%= content_for(:flash_content) do %>
     <%= locking_flash( render :partial => 'lock_info', :locals => {:stage => current_stage, :deployment => @deployment}) %>
   <% end %>
 <% end %>
 
 <% flashed_errors(:deployment) %>
 
-<% form_for(:deployment, :url => project_stage_deployments_path(@project, @stage)) do |f| %>
+<%= form_for(:deployment, :url => project_stage_deployments_path(@project, @stage)) do |f| %>
 <div style="width:330px;">
   <p>
     <b>Task</b><br />
@@ -41,7 +41,7 @@
 </div>
 <% end %>
 
-<% content_for(:page_scripts) do %>
+<%= content_for(:page_scripts) do %>
   <script type="text/javascript">
     
     function toggle_host(){
@@ -85,7 +85,7 @@
   </script>
 <% end %>
 
-<% content_for(:action_box) do %>
+<%= content_for(:action_box) do %>
 <div class="small_box">
   <div class="small_box_top"></div>
   <div class="small_box_middle" style="min-height: 140px; *height: 160px;">
@@ -118,7 +118,7 @@
 </div>
 <% end %>
 
-<% content_for(:breadcrumb) do %>
+<%= content_for(:breadcrumb) do %>
   <% breadcrumb_box do %>
     <%= link_to "Back to stage", project_stage_path(current_project, current_stage), :style => "float:right", :class => "arrow_link" %>
     <%= link_to "Projects", projects_path %> &gt; 
@@ -128,7 +128,7 @@
   <% end %>
 <% end %>
 
-<% content_for(:page_title) do %>
+<%= content_for(:page_title) do %>
   <% @page_title = "Deploy stage #{h(current_stage.name)} of project #{h(current_project.name)}" %>
   <h2>Deployment</h2>
 <% end %>

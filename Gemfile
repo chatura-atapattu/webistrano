@@ -1,15 +1,38 @@
-source "http://rubygems.org"
+source 'https://rubygems.org'
 
-gem 'bundler', "~>1.0.10"
-gem "rails", "2.3.11"
-gem "mysql"
-gem "erubis"
-gem "rake"
-gem "syntax", "1.0.0"
-gem "capistrano", "2.6.0"
-gem "open4", "0.9.3"
-gem "exception_notification", "2.3.3.0"
+gem 'rails', '3.2.2'
+
+# Bundle edge Rails instead:
+# gem 'rails', :git => 'git://github.com/rails/rails.git'
+
+gem "mysql2", "~> 0.3.11"
+
+# Gems from webistrano 2.3.11
+gem "erubis", "~> 2.7.0"
+gem "syntax", "~> 1.0.0"
+gem "capistrano", "~> 2.11.2"
+gem "highline", "~> 1.6.11"
+gem "open4", "~> 1.3.0"
+gem "exception_notification", "~> 2.5.2"
 
 group :test do
-  gem "mocha", "0.9.8"
+  gem "mocha", "~> 0.10.5"
 end
+
+group :development do
+  gem "debugger", "~> 1.0.0"
+end
+
+# Gems used only for assets and not required
+# in production environments by default.
+group :assets do
+  gem 'sass-rails',   '~> 3.2.3'
+  gem 'coffee-rails', '~> 3.2.1'
+
+  # See https://github.com/sstephenson/execjs#readme for more supported runtimes
+  # gem 'therubyracer'
+
+  gem 'uglifier', '>= 1.0.3'
+end
+
+gem "jquery-rails", "~> 2.0.2"

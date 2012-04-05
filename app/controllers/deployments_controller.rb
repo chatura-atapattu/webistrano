@@ -63,7 +63,7 @@ class DeploymentsController < ApplicationController
 
   # GET /projects/1/stages/1/deployments/latest
   def latest
-    @deployment = @stage.deployments.find(:first, :order => "created_at desc")
+    @deployment = @stage.deployments.order('created_at DESC').first
 
     respond_to do |format|
       format.html { render :action => "show"}
@@ -80,7 +80,7 @@ class DeploymentsController < ApplicationController
   # POST /projects/1/stages/1/deployments/1/cancel
   def cancel
     redirect_to "/" and return unless request.post?
-    @deployment = @stage.deployments.find(:first, :order => "created_at desc")
+    @deployment = @stage.deployments.order('created_at DESC').first
 
     respond_to do |format|
       begin

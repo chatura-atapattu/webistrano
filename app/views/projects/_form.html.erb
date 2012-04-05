@@ -13,7 +13,7 @@
 </p>
 
 
-<% content_for(:page_scripts) do %>
+<%= content_for(:page_scripts) do %>
  <script type="text/javascript">
  
     Event.observe(window, 'load', function(){
@@ -37,7 +37,7 @@
 
  </script>
 <% end %>
-<% content_for(:action_box) do %>
+<%= content_for(:action_box) do %>
 <div class="small_box">
   <div class="small_box_top"></div>
   <div class="small_box_middle" style="min-height: 230px; *height: 230px;">

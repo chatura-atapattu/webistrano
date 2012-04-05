@@ -36,7 +36,7 @@
   <%= render(:partial => 'stages')%>
 </fieldset>
 
-<% content_for(:breadcrumb) do %>
+<%= content_for(:breadcrumb) do %>
   <% breadcrumb_box do %>
     <%= link_to "Manage hosts", hosts_path, :style => "float:right", :class => "arrow_link" %>
     <%= link_to "Hosts", hosts_path %> &gt; 
@@ -44,7 +44,7 @@
   <% end %>
 <% end %>
 
-<% content_for(:page_title) do %>
+<%= content_for(:page_title) do %>
   <% @page_title = "Host #{h(@host.name)}" %>
   <h2>Host <%=h @host.name %></h2>
 <% end %>
