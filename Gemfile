@@ -11,6 +11,7 @@ gem "highline", "~> 1.6.11"
 gem "open4", "~> 1.3.0"
 gem "exception_notification", "~> 2.5.2"
 gem "version_fu", "~> 1.0.1"
+gem "sql-logging", "~> 3.0.6"
 
 # New gems for 3.2.2
 gem "devise", "~> 2.0.4"
