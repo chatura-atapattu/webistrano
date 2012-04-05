@@ -21,7 +21,8 @@ Webistrano is a Web UI for managing Capistrano deployments. It lets you manage p
 
    <tt>RAILS_ENV=production rake db:migrate</tt>
   
-3. Start Webistrano  
+3. Start Webistrano
+
    <tt>cd webistrano</tt>
 
    <tt>ruby script/rails server -d -p 3000 -e production</tt>
