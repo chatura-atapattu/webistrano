@@ -125,7 +125,7 @@ module ApplicationHelper
   
   def breadcrumb_box(&block)
     out = "<div class='breadcrumb'><b>".html_safe
-    out << capture(&block) if block
+    out << capture(&block).html_safe if block
     out << "</b></div>".html_safe
     
     block ? concat(out) : out
