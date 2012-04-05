@@ -1,10 +1,6 @@
 source 'https://rubygems.org'
 
 gem 'rails', '3.2.2'
-
-# Bundle edge Rails instead:
-# gem 'rails', :git => 'git://github.com/rails/rails.git'
-
 gem "mysql2", "~> 0.3.11"
 
 # Gems from webistrano 2.3.11
@@ -14,6 +10,10 @@ gem "capistrano", "~> 2.11.2"
 gem "highline", "~> 1.6.11"
 gem "open4", "~> 1.3.0"
 gem "exception_notification", "~> 2.5.2"
+gem "version_fu", "~> 1.0.1"
+
+# New gems for 3.2.2
+gem "devise", "~> 2.0.4"
 
 group :test do
   gem "mocha", "~> 0.10.5"

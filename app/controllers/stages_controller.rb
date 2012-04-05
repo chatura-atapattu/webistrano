@@ -1,5 +1,4 @@
 class StagesController < ApplicationController
-
   before_filter :load_project
   
   # GET /projects/1/stages.xml

@@ -1,5 +1,4 @@
 class DeploymentsController < ApplicationController
-  
   before_filter :load_stage
   before_filter :ensure_deployment_possible, :only => [:new, :create]
 

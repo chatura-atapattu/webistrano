@@ -1,5 +1,4 @@
 class ProjectConfigurationsController < ApplicationController
-  
   before_filter :load_project
   
   # GET /projects/1/project_configurations/1

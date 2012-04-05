@@ -1,5 +1,4 @@
 class ApplicationController < ActionController::Base
-  include BrowserFilters
   #include ExceptionNotification::Notifiable
   include AuthenticatedSystem
   

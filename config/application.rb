@@ -15,10 +15,10 @@ module Webistrano
     # If you change this key, all old sessions will become invalid!
     # Make sure the secret is at least 30 characters and all random, 
     # no regular words or you'll be exposed to dictionary attacks.
-    config.action_controller.session = {
-      :key    => '_webistrano_session',
-      :secret => WebistranoConfig[:session_secret]
-    }
+    #config.action_controller.session = {
+    #  :key    => '_webistrano_session',
+    #  :secret => WebistranoConfig[:session_secret]
+    #}
   
     # Make Active Record use UTC-base instead of local time
     config.time_zone = 'UTC'

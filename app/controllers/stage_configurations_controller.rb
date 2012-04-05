@@ -1,5 +1,4 @@
 class StageConfigurationsController < ApplicationController
-  
   before_filter :load_stage
   
   # GET /project/1/stage/1/stage_configurations/1
