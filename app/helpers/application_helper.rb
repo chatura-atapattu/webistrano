@@ -16,7 +16,6 @@ module ApplicationHelper
   def flashed_errors(object_name)
     obj = instance_variable_get("@#{object_name}")
     return nil if obj.errors.blank?
-    
       
     error_messages = obj.errors.full_messages.map {|msg| content_tag(:li, msg)}
 
@@ -125,9 +124,9 @@ module ApplicationHelper
   end
   
   def breadcrumb_box(&block)
-    out = "<div class='breadcrumb'><b>"
+    out = "<div class='breadcrumb'><b>".html_safe
     out << capture(&block) if block
-    out << "</b></div>"
+    out << "</b></div>".html_safe
     
     block ? concat(out) : out
   end
