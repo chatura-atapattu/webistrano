@@ -1,14 +1,33 @@
+# CAS Authentication via Devis requires that cas_base_url be set. Other settings
+# may be overridden as required. Set the configuration values in this file and
+# uncomment the required lines in webistrano_configuration.rb in order to load 
+# these values.
+
+# :cas_login_url: 'https://cas.myorganization.com/login'
+# :cas_logout_url: 'https://cas.myorganization.com/logout'
+# :cas_validate_url: 'https://cas.myorganization.com/serviceValidate'
+
+# The CAS specification allows for the passing of a follow URL to be displayed when
+# a user logs out on the CAS server. RubyCAS-Server also supports redirecting to a
+# URL via the destination param. Set either of these urls and specify either nil,
+# 'destination' or 'follow' as the logout_url_param. If the urls are blank but
+# logout_url_param is set, a default will be detected for the service.
+
+# :cas_destination_url: 'https://cas.myorganization.com'
+# :cas_follow_url: 'https://cas.myorganization.com'
+# :cas_logout_url_param = nil
+
+# By default, devise_cas_authenticatable will create users.  If you would rather
+# require user records to already exist locally before they can authenticate via
+# CAS, uncomment the following line.
+
+# :cas_create_user: false 
+
 development:
-    :cas_base_url: https://cas.devexample.tld/cas/
-    :validate_url: https://cas.devexample.tld/cas/validate
-    :logout_url: https://cas.devexample.tld/cas/logout
+  :cas_base_url: 'https://cas.myorganization.com'
  
 test:
-    :cas_base_url: https://cas.qaexample.tld/cas/
-    :validate_url: https://cas.qaexample.tld/cas/validate
-    :logout_url: https://cas.qaexample.tld/cas/logout
+  :cas_base_url: 'https://cas.myorganization.com'
  
 production:
-    :cas_base_url: https://cas.example.tld/cas/
-    :validate_url: https://cas.example.tld/cas/validate
-    :logout_url: https://cas.example.tld/cas/logout
+  :cas_base_url: 'https://cas.myorganization.com'

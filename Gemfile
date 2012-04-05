@@ -15,6 +15,9 @@ gem "version_fu", "~> 1.0.1"
 # New gems for 3.2.2
 gem "devise", "~> 2.0.4"
 
+# If using CAS
+# gem "devise_cas_authenticatable", "~> 1.1.1"
+
 group :test do
   gem "mocha", "~> 0.10.5"
 end

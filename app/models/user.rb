@@ -1,7 +1,6 @@
 require 'digest/sha1'
 class User < ActiveRecord::Base
-  # Include default devise modules. Others available are:
-  # :token_authenticatable, :encryptable, :confirmable, :lockable, :timeoutable and :omniauthable
+  # devise :cas_authenticatable instead of :database_authenticatable if using CAS Authentication
   devise :database_authenticatable, :registerable, :rememberable, :validatable, :encryptable, :encryptor => :restful_authentication_sha1
 
   # Setup accessible (or protected) attributes for your model
@@ -124,5 +123,16 @@ class User < ActiveRecord::Base
     
     def password_required?
       WebistranoConfig[:authentication_method] != :cas && (encrypted_password.blank? || !password.blank?)
+    end
+    
+    def cas_extra_attributes=(extra_attributes)
+      extra_attributes.each do |name, value|
+        case name.to_sym
+          when :fullname
+            self.login = value
+          when :email
+            self.email = value
+        end
+      end
     end
 end
